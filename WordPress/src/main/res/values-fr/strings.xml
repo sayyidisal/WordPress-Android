@@ -1,11 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Translation-Revision-Date: 2019-02-26 18:24:21+0000
+Translation-Revision-Date: 2019-03-26 16:15:44+0000
 Plural-Forms: nplurals=2; plural=n > 1;
 Generator: GlotPress/2.4.0-alpha
 Language: fr
 -->
 <resources>
+    <string name="new_site_creation_preview_subtitle">Vous pourrez personnaliser l’apparence de votre site plus tard</string>
+    <string name="publish_on">Publier le : %s</string>
+    <string name="schedule_for">Planifier pour le : %s</string>
+    <string name="published_on">Publié le : %s</string>
+    <string name="scheduled_for">Planifié pour le : %s</string>
+    <string name="stats_detail_recent_weeks">Dernières semaines</string>
+    <string name="stats_detail_average_views_per_day">Nbr. moy. de vues par jour</string>
+    <string name="stats_months_and_years_views_label">Vues</string>
+    <string name="stats_months_and_years_period_label">Période</string>
+    <string name="stats_detail_months_and_years">Mois et années</string>
+    <string name="stats_insights_load_more">En charger plus</string>
+    <string name="stats_insights_today_stats">Aujourd’hui</string>
+    <string name="stats_insights_best_hour">Meilleure heure</string>
+    <string name="stats_insights_best_day">Meilleur jour</string>
+    <string name="showing_stats_for">Afficher les stats pour :</string>
+    <string name="app_rating_rate_never">Non merci</string>
+    <string name="app_rating_rate_later">Plus tard</string>
+    <string name="app_rating_rate_now">Évaluer maintenant</string>
+    <string name="app_rating_message">Ravi de vous revoir! Si vous creusez l\'application, nous aimerions une évaluation sur le Google Play Store.</string>
+    <string name="app_rating_title">Vous aimez WordPress ?</string>
+    <string name="editor_post_converted_back_to_draft">Article reconverti en brouillon</string>
+    <string name="stats_insights_posting_activity">Activité de publication</string>
+    <string name="stats_site_not_loaded_yet">Site non encore chargé</string>
+    <string name="stats_more_posts">Plus d’articles</string>
+    <string name="stats_fewer_posts">Moins d’articles</string>
     <string name="gutenberg_mobile_src_block_management_inline_toolbar_index_js_66">Retirer le contenu</string>
     <string name="gutenberg_mobile_src_block_management_inline_toolbar_index_js_55">Descendre le bloc</string>
     <string name="gutenberg_mobile_src_block_management_inline_toolbar_index_js_48">Monter le bloc</string>
@@ -172,8 +197,7 @@ Language: fr
     <string name="stats_insights_latest_post_with_no_engagement">%2$s est publié depuis %1$s. Lancez-vous et augmentez le nombre de vues de votre article en le partageant :</string>
     <string name="stats_insights_latest_post_empty">Vous n’avez pas encore publié d’articles. Lorsque vous commencez à publier, le résumé de votre dernier article apparaît ici :</string>
     <string name="stats_insights_tags_and_categories">Étiquettes et catégories</string>
-    <string name="stats_insights_all_time_stats">Statistiques globales</string>
-    <string name="stats_insights_today_stats">Statistiques du jour</string>
+    <string name="stats_insights_all_time_stats">Depuis le début</string>
     <string name="stats_from_to_dates_in_week_label">%1$s - %2$s</string>
     <string name="stats_publicize_followers_label">Abonnés</string>
     <string name="stats_publicize_service_label">Service</string>

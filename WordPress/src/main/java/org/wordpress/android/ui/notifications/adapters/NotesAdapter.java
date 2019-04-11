@@ -19,7 +19,7 @@ import org.wordpress.android.datasets.NotificationsTable;
 import org.wordpress.android.fluxc.model.CommentStatus;
 import org.wordpress.android.models.Note;
 import org.wordpress.android.ui.comments.CommentUtils;
-import org.wordpress.android.ui.notifications.NotificationsListFragment;
+import org.wordpress.android.ui.notifications.NotificationsListFragmentPage.OnNoteClickListener;
 import org.wordpress.android.ui.notifications.utils.NotificationsUtilsWrapper;
 import org.wordpress.android.util.GravatarUtils;
 import org.wordpress.android.util.RtlUtils;
@@ -81,7 +81,7 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
         void onLoadMore(long timestamp);
     }
 
-    private NotificationsListFragment.OnNoteClickListener mOnNoteClickListener;
+    private OnNoteClickListener mOnNoteClickListener;
 
     public NotesAdapter(Context context, DataLoadedListener dataLoadedListener, OnLoadMoreListener onLoadMoreListener) {
         super();
@@ -96,8 +96,8 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
         setHasStableIds(false);
 
         mAvatarSz = (int) context.getResources().getDimension(R.dimen.notifications_avatar_sz);
-        mColorRead = context.getResources().getColor(R.color.white);
-        mColorUnread = context.getResources().getColor(R.color.grey_light);
+        mColorRead = context.getResources().getColor(android.R.color.white);
+        mColorUnread = context.getResources().getColor(R.color.background_notification_unread);
         mTextIndentSize = context.getResources().getDimensionPixelSize(R.dimen.notifications_text_indent_sz);
     }
 
@@ -285,11 +285,11 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
         String noticonCharacter = note.getNoticonCharacter();
         noteViewHolder.mNoteIcon.setText(noticonCharacter);
         if (commentStatus == CommentStatus.UNAPPROVED) {
-            noteViewHolder.mNoteIcon.setBackgroundResource(R.drawable.shape_oval_orange);
+            noteViewHolder.mNoteIcon.setBackgroundResource(R.drawable.bg_oval_warning_stroke_white);
         } else if (isUnread) {
-            noteViewHolder.mNoteIcon.setBackgroundResource(R.drawable.shape_oval_blue_white_stroke);
+            noteViewHolder.mNoteIcon.setBackgroundResource(R.drawable.bg_oval_primary_400_stroke_notification_unread);
         } else {
-            noteViewHolder.mNoteIcon.setBackgroundResource(R.drawable.shape_oval_grey_lighten_10);
+            noteViewHolder.mNoteIcon.setBackgroundResource(R.drawable.bg_oval_neutral_200_stroke_white);
         }
 
         if (isUnread) {
@@ -324,7 +324,7 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
         return RecyclerView.NO_POSITION;
     }
 
-    public void setOnNoteClickListener(NotificationsListFragment.OnNoteClickListener mNoteClickListener) {
+    public void setOnNoteClickListener(OnNoteClickListener mNoteClickListener) {
         mOnNoteClickListener = mNoteClickListener;
     }
 

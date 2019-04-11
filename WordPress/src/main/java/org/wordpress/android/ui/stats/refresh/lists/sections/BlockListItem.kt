@@ -17,6 +17,8 @@ import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.
 import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.LIST_ITEM_WITH_ICON
 import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.LOADING_ITEM
 import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.MAP
+import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.REFERRED_ITEM
+import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.QUICK_SCAN_ITEM
 import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.TABS
 import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.TEXT
 import org.wordpress.android.ui.stats.refresh.lists.sections.BlockListItem.Type.TITLE
@@ -47,10 +49,14 @@ sealed class BlockListItem(val type: Type) {
         EXPANDABLE_ITEM,
         DIVIDER,
         LOADING_ITEM,
-        ACTIVITY_ITEM
+        ACTIVITY_ITEM,
+        REFERRED_ITEM,
+        QUICK_SCAN_ITEM
     }
 
     data class Title(@StringRes val textResource: Int? = null, val text: String? = null) : BlockListItem(TITLE)
+
+    data class ReferredItem(@StringRes val label: Int, val itemTitle: String) : BlockListItem(REFERRED_ITEM)
 
     data class ValueItem(
         val value: String,
@@ -93,6 +99,10 @@ sealed class BlockListItem(val type: Type) {
         enum class TextStyle {
             NORMAL, LIGHT
         }
+    }
+
+    data class QuickScanItem(val leftColumn: Column, val rightColumn: Column) : BlockListItem(QUICK_SCAN_ITEM) {
+        data class Column(@StringRes val label: Int, val value: String, val tooltip: String? = null)
     }
 
     data class Information(val text: String) : BlockListItem(INFO)

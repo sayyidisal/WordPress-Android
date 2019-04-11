@@ -33,7 +33,11 @@ abstract class BaseStatsUseCase<DOMAIN_MODEL, UI_STATE>(
     private val domainState = MutableLiveData<UseCaseState>()
     private val domainModel = MutableLiveData<DOMAIN_MODEL>()
     protected val uiState = MediatorLiveData<UI_STATE>()
-    val liveData: LiveData<UseCaseModel> = merge(domainModel, domainState, uiState) { data, domainState, uiState ->
+    val liveData: LiveData<UseCaseModel> = merge(
+            domainModel.distinct(),
+            domainState,
+            uiState
+    ) { data, domainState, uiState ->
         val currentData = data?.let { buildUiModel(data, uiState ?: defaultUiState) }
         try {
             when (domainState) {
@@ -90,16 +94,23 @@ abstract class BaseStatsUseCase<DOMAIN_MODEL, UI_STATE>(
     }
 
     protected suspend fun evaluateState(state: State<DOMAIN_MODEL>) {
-        withContext(mainDispatcher) {
-            val useCaseState = when (state) {
-                is Error -> ERROR
-                is Data -> {
-                    domainModel.value = state.model
-                    SUCCESS
+        val useCaseState = when (state) {
+            is Error -> ERROR
+            is Data -> {
+                if (!state.cached) {
+                    val updatedCachedData = loadCachedData()
+                    withContext(mainDispatcher) {
+                        if (domainModel.value != updatedCachedData) {
+                            domainModel.value = updatedCachedData
+                        }
+                    }
                 }
-                is Empty -> EMPTY
-                is Loading -> LOADING
+                SUCCESS
             }
+            is Empty -> EMPTY
+            is Loading -> LOADING
+        }
+        withContext(mainDispatcher) {
             updateUseCaseState(useCaseState)
         }
     }
@@ -182,7 +193,7 @@ abstract class BaseStatsUseCase<DOMAIN_MODEL, UI_STATE>(
 
     sealed class State<DOMAIN_MODEL> {
         data class Error<DOMAIN_MODEL>(val error: String) : State<DOMAIN_MODEL>()
-        data class Data<DOMAIN_MODEL>(val model: DOMAIN_MODEL) : State<DOMAIN_MODEL>()
+        data class Data<DOMAIN_MODEL>(val model: DOMAIN_MODEL, val cached: Boolean = false) : State<DOMAIN_MODEL>()
         class Empty<DOMAIN_MODEL> : State<DOMAIN_MODEL>()
         class Loading<DOMAIN_MODEL> : State<DOMAIN_MODEL>()
     }

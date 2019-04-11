@@ -274,7 +274,7 @@ public class EditPostActivity extends AppCompatActivity implements
     private boolean mMediaInsertedOnCreation;
 
     private List<String> mPendingVideoPressInfoRequests;
-    private List<String> mAztecBackspaceDeletedMediaItemIds = new ArrayList<>();
+    private List<String> mAztecBackspaceDeletedOrGbBlockDeletedMediaItemIds = new ArrayList<>();
     private List<String> mMediaMarkedUploadingOnStartIds = new ArrayList<>();
     private PostEditorAnalyticsSession mPostEditorAnalyticsSession;
     private boolean mIsConfigChange = false;
@@ -520,13 +520,6 @@ public class EditPostActivity extends AppCompatActivity implements
 
             mShowGutenbergEditor = PostUtils.shouldShowGutenbergEditor(mIsNewPost, mPost)
                                    && restartEditorOption != RestartEditorOptions.RESTART_SUPPRESS_GUTENBERG;
-
-            // override this if we're being fed media to start a Post for now
-            // EXTRA_INSERT_MEDIA comes from the WP app Media section, and EXTRA_STREAM is what we check
-            // for when receiving content from outside the WP app to be shared there
-            if (getIntent().hasExtra(EXTRA_INSERT_MEDIA) || getIntent().hasExtra(Intent.EXTRA_STREAM)) {
-                mShowGutenbergEditor = false;
-            }
         } else {
             mShowGutenbergEditor = savedInstanceState.getBoolean(STATE_KEY_GUTENBERG_IS_SHOWN);
         }
@@ -603,9 +596,21 @@ public class EditPostActivity extends AppCompatActivity implements
             mOriginalPostHadLocalChangesOnOpen = mOriginalPost.isLocallyChanged();
             mPost = UploadService.updatePostWithCurrentlyCompletedUploads(mPost);
             if (mShowAztecEditor) {
-                mMediaMarkedUploadingOnStartIds =
-                        AztecEditorFragment.getMediaMarkedUploadingInPostContent(this, mPost.getContent());
-                Collections.sort(mMediaMarkedUploadingOnStartIds);
+                try {
+                    mMediaMarkedUploadingOnStartIds =
+                            AztecEditorFragment.getMediaMarkedUploadingInPostContent(this, mPost.getContent());
+                    Collections.sort(mMediaMarkedUploadingOnStartIds);
+                } catch (NumberFormatException err) {
+                    // see: https://github.com/wordpress-mobile/AztecEditor-Android/issues/805
+                    if (getSite() != null && getSite().isWPCom() && !getSite().isPrivate()
+                            && TextUtils.isEmpty(mPost.getPassword())
+                            && !PostStatus.PRIVATE.toString().equals(mPost.getStatus())) {
+                        AppLog.e(T.EDITOR, "There was an error initializing post object!");
+                        AppLog.e(AppLog.T.EDITOR, "HTML content of the post before the crash:");
+                        AppLog.e(AppLog.T.EDITOR, mPost.getContent());
+                        throw err;
+                    }
+                }
             }
             mIsPage = mPost.isPage();
 
@@ -765,7 +770,9 @@ public class EditPostActivity extends AppCompatActivity implements
     @Override
     protected void onDestroy() {
         if (!mIsConfigChange && (mRestartEditorOption == RestartEditorOptions.NO_RESTART)) {
-            mPostEditorAnalyticsSession.end();
+            if (mPostEditorAnalyticsSession != null) {
+                mPostEditorAnalyticsSession.end();
+            }
         }
         AnalyticsTracker.track(AnalyticsTracker.Stat.EDITOR_CLOSED);
         mDispatcher.unregister(this);
@@ -1734,9 +1741,7 @@ public class EditPostActivity extends AppCompatActivity implements
                 mZendeskHelper.createNewTicket(this, Origin.DISCARD_CHANGES, mSite);
                 break;
             case TAG_PUBLISH_CONFIRMATION_DIALOG:
-                mPost.setStatus(PostStatus.PUBLISHED.toString());
-                mPostEditorAnalyticsSession.setOutcome(Outcome.PUBLISH);
-                publishPost();
+                publishPost(PostStatus.fromPost(mPost) == PostStatus.DRAFT);
                 AppRatingDialog.INSTANCE
                         .incrementInteractions(APP_REVIEWS_EVENT_INCREMENTED_BY_PUBLISHING_POST_OR_PAGE);
                 break;
@@ -1745,7 +1750,7 @@ public class EditPostActivity extends AppCompatActivity implements
                 mEditorFragment.removeAllFailedMediaUploads();
                 break;
             case ASYNC_PROMO_DIALOG_TAG:
-                publishPost();
+                publishPost(PostStatus.fromPost(mPost) == PostStatus.DRAFT);
                 break;
             case TAG_GB_INFORMATIVE_DIALOG:
                 // no op
@@ -1965,6 +1970,10 @@ public class EditPostActivity extends AppCompatActivity implements
     }
 
     private void publishPost() {
+        publishPost(false);
+    }
+
+    private void publishPost(final boolean isDraftToPublish) {
         AccountModel account = mAccountStore.getAccount();
         // prompt user to verify e-mail before publishing
         if (!account.getEmailVerified()) {
@@ -1997,12 +2006,9 @@ public class EditPostActivity extends AppCompatActivity implements
             return;
         }
 
-        boolean postUpdateSuccessful = updatePostObject();
-        if (!postUpdateSuccessful) {
-            // just return, since the only case updatePostObject() can fail is when the editor
-            // fragment is not added to the activity
-            return;
-        }
+        // Loading the content from the GB HTML editor can take time on long posts.
+        // Let's show a progress dialog for now. Ref: https://github.com/wordpress-mobile/gutenberg-mobile/issues/713
+        mEditorFragment.showSavingProgressDialogIfNeeded();
 
         // Update post, save to db and publish in its own Thread, because 1. update can be pretty slow with a lot of
         // text 2. better not to call `updatePostObject()` from the UI thread due to weird thread blocking behavior
@@ -2011,11 +2017,18 @@ public class EditPostActivity extends AppCompatActivity implements
             @Override
             public void run() {
                 boolean isFirstTimePublish = isFirstTimePublish();
+                if (isDraftToPublish) {
+                    // now set status to PUBLISHED - only do this AFTER we have run the isFirstTimePublish() check,
+                    // otherwise we'd have an incorrect value
+                    mPost.setStatus(PostStatus.PUBLISHED.toString());
+                    mPostEditorAnalyticsSession.setOutcome(Outcome.PUBLISH);
+                }
 
                 boolean postUpdateSuccessful = updatePostObject();
                 if (!postUpdateSuccessful) {
                     // just return, since the only case updatePostObject() can fail is when the editor
                     // fragment is not added to the activity
+                    mEditorFragment.hideSavingProgressDialog();
                     return;
                 }
 
@@ -2024,6 +2037,8 @@ public class EditPostActivity extends AppCompatActivity implements
                 // if post was modified or has unsaved local changes and is publishable, save it
                 saveResult(isPublishable, false, false);
 
+                // Hide the progress dialog now
+                mEditorFragment.hideSavingProgressDialog();
                 if (isPublishable) {
                     if (NetworkUtils.isNetworkAvailable(getBaseContext())) {
                         // Show an Alert Dialog asking the user if they want to remove all failed media before upload
@@ -2230,7 +2245,7 @@ public class EditPostActivity extends AppCompatActivity implements
                 case 3:
                     return HistoryListFragment.Companion.newInstance(mPost, mSite);
                 default:
-                    return EditPostPreviewFragment.newInstance(mPost);
+                    return EditPostPreviewFragment.newInstance(mPost, mSite);
             }
         }
 
@@ -2415,12 +2430,14 @@ public class EditPostActivity extends AppCompatActivity implements
             mEditorFragment.setFeaturedImageId(mPost.getFeaturedImageId());
         }
 
-        // Special actions
-        String action = getIntent().getAction();
-        if (Intent.ACTION_SEND.equals(action) || Intent.ACTION_SEND_MULTIPLE.equals(action)) {
-            setPostContentFromShareAction();
-        } else if (NEW_MEDIA_POST.equals(action)) {
-            prepareMediaPost();
+        // Special actions - these only make sense for empty posts that are going to be populated now
+        if (TextUtils.isEmpty(mPost.getContent())) {
+            String action = getIntent().getAction();
+            if (Intent.ACTION_SEND.equals(action) || Intent.ACTION_SEND_MULTIPLE.equals(action)) {
+                setPostContentFromShareAction();
+            } else if (NEW_MEDIA_POST.equals(action)) {
+                prepareMediaPost();
+            }
         }
     }
 
@@ -2474,11 +2491,13 @@ public class EditPostActivity extends AppCompatActivity implements
                     sharedUris = new ArrayList<Uri>();
                     sharedUris.add((Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM));
                 } else {
-                    return;
+                    sharedUris = null;
                 }
             }
 
             if (sharedUris != null) {
+                // removing this from the intent so it doesn't insert the media items again on each Acivity re-creation
+                getIntent().removeExtra(Intent.EXTRA_STREAM);
                 addMediaList(sharedUris, false);
             }
         }
@@ -3482,9 +3501,8 @@ public class EditPostActivity extends AppCompatActivity implements
     @Override
     public void onMediaDeleted(String localMediaId) {
         if (!TextUtils.isEmpty(localMediaId)) {
-            if (mShowAztecEditor) {
-                mAztecBackspaceDeletedMediaItemIds.add(localMediaId);
-                UploadService.setDeletedMediaItemIds(mAztecBackspaceDeletedMediaItemIds);
+            if (mShowAztecEditor && !mShowGutenbergEditor) {
+                setDeletedMediaIdOnUploadService(localMediaId);
                 // passing false here as we need to keep the media item in case the user wants to undo
                 cancelMediaUpload(StringUtils.stringToInt(localMediaId), false);
             } else if (mShowGutenbergEditor) {
@@ -3492,6 +3510,8 @@ public class EditPostActivity extends AppCompatActivity implements
                 if (mediaModel == null) {
                     return;
                 }
+
+                setDeletedMediaIdOnUploadService(localMediaId);
 
                 // also make sure it's not being uploaded anywhere else (maybe on some other Post,
                 // simultaneously)
@@ -3502,6 +3522,11 @@ public class EditPostActivity extends AppCompatActivity implements
                 }
             }
         }
+    }
+
+    private void setDeletedMediaIdOnUploadService(String localMediaId) {
+        mAztecBackspaceDeletedOrGbBlockDeletedMediaItemIds.add(localMediaId);
+        UploadService.setDeletedMediaItemIds(mAztecBackspaceDeletedOrGbBlockDeletedMediaItemIds);
     }
 
     private void cancelMediaUpload(int localMediaId, boolean delete) {
@@ -3520,7 +3545,7 @@ public class EditPostActivity extends AppCompatActivity implements
     * physically delete from the FluxC DB those items that have been deleted by the user using backspace.
     * */
     private void definitelyDeleteBackspaceDeletedMediaItems() {
-        for (String mediaId : mAztecBackspaceDeletedMediaItemIds) {
+        for (String mediaId : mAztecBackspaceDeletedOrGbBlockDeletedMediaItemIds) {
             if (!TextUtils.isEmpty(mediaId)) {
                 // make sure the MediaModel exists
                 MediaModel mediaModel = mMediaStore.getMediaWithLocalId(StringUtils.stringToInt(mediaId));
@@ -3563,9 +3588,9 @@ public class EditPostActivity extends AppCompatActivity implements
 
             if (!found) {
                 if (mEditorFragment instanceof AztecEditorFragment) {
-                    mAztecBackspaceDeletedMediaItemIds.remove(mediaId);
+                    mAztecBackspaceDeletedOrGbBlockDeletedMediaItemIds.remove(mediaId);
                     // update the mediaIds list in UploadService
-                    UploadService.setDeletedMediaItemIds(mAztecBackspaceDeletedMediaItemIds);
+                    UploadService.setDeletedMediaItemIds(mAztecBackspaceDeletedOrGbBlockDeletedMediaItemIds);
                     ((AztecEditorFragment) mEditorFragment).setMediaToFailed(mediaId);
                 }
             }
@@ -3936,7 +3961,7 @@ public class EditPostActivity extends AppCompatActivity implements
                 getString(title),
                 getString(description),
                 getString(button),
-                R.drawable.img_publish_button_124dp,
+                R.drawable.img_illustration_hand_checkmark_button_124dp,
                 getString(R.string.keep_editing),
                 getString(R.string.async_promo_link));
 

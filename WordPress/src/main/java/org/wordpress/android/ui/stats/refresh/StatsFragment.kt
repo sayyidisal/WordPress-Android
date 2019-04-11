@@ -75,6 +75,7 @@ class StatsFragment : DaggerFragment() {
     private fun initializeViews(activity: FragmentActivity) {
         statsPager.adapter = StatsPagerAdapter(activity, childFragmentManager)
         tabLayout.setupWithViewPager(statsPager)
+        statsPager.pageMargin = resources.getDimensionPixelSize(R.dimen.margin_extra_large)
         statsPager.setCurrentItem(viewModel.getSelectedSection().ordinal, false)
         tabLayout.addOnTabSelectedListener(object : OnTabSelectedListener {
             override fun onTabReselected(tab: Tab?) {
@@ -153,8 +154,19 @@ class StatsFragment : DaggerFragment() {
         })
 
         viewModel.toolbarHasShadow.observe(this, Observer { hasShadow ->
-            val elevation = if (hasShadow == true) resources.getDimension(R.dimen.appbar_elevation) else 0f
-            app_bar_layout.postDelayed({ ViewCompat.setElevation(app_bar_layout, elevation) }, 100)
+            app_bar_layout.postDelayed(
+                    {
+                        if (app_bar_layout != null) {
+                            val elevation = if (hasShadow == true) {
+                                resources.getDimension(R.dimen.appbar_elevation)
+                            } else {
+                                0f
+                            }
+                            ViewCompat.setElevation(app_bar_layout, elevation)
+                        }
+                    },
+                    100
+            )
         })
 
         viewModel.siteChanged.observe(this, Observer {
